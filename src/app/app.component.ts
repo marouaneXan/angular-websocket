@@ -1,36 +1,29 @@
-import { Component, OnInit, NgZone } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { WebsocketService } from './service/websocket.service';
-import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
-  styleUrls: ['./app.component.css']
+  styleUrls: ['./app.component.css'],
 })
-export class AppComponent implements OnInit {
+export class AppComponent implements OnInit, OnDestroy {
   title = 'websocket-angular';
   messages: string[] = [];
   message: string = '';
-  private messageSubscription: Subscription = new Subscription();
 
-  constructor(public websocketService: WebsocketService,private ngZone: NgZone) {
-    console.log(this.messages);
-  }
+  constructor(public websocketService: WebsocketService, private cdr: ChangeDetectorRef) {}
 
   ngOnInit(): void {
     this.websocketService.connect();
-    this.messageSubscription = this.websocketService.messageSubject.subscribe((message) => {
-      this.ngZone.run(() => {
-        console.log('Messages array: ', this.messages);
-        this.messages.push(message);
-        console.log('Message received in component: ' + message);
-      });
+    this.websocketService.messageSubject.subscribe((message) => {
+      this.messages.push(message);
+      console.log('Message received in component: ' + message);
+      this.cdr.detectChanges(); // Trigger change detection
     });
   }
 
   ngOnDestroy(): void {
     this.websocketService.disconnect();
-    this.messageSubscription.unsubscribe();
   }
 
   sendMessage(): void {

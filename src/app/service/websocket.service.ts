@@ -1,64 +1,42 @@
 import { Injectable } from '@angular/core';
-import * as SockJS from 'sockjs-client';
-import { Client, over } from 'stompjs';
 import { Subject } from 'rxjs';
 
 @Injectable({
   providedIn: 'root',
 })
 export class WebsocketService {
-  private stompClient: Client | undefined;
+  private ws: WebSocket | undefined;
   public messageSubject = new Subject<string>();
 
-  constructor() { }
-
   connect(): void {
-  console.log('Connecting...');
-  const socket = new SockJS('http://localhost:8080/websocket-endpoint');
-  this.stompClient = over(socket);
+    console.log('Connecting...');
+    this.ws = new WebSocket('ws://localhost:8080');
 
-  this.stompClient.debug = (str) => {
-    console.log('STOMP: ' + str);
-  };
+    this.ws.onmessage = (event) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const data = reader.result as string;
+        console.log('Received: ' + data);
+        this.messageSubject.next(data);
+      };
+      reader.readAsText(event.data as Blob);
+    };
 
-  this.stompClient.connect(
-    {},
-    (frame) => {
-      console.log('Connected: ' + frame);
-      this.subscribeToTopic();
-    },
-    (error) => {
-      console.log('Error: ' + error);
-    }
-  );
-}
-
-  subscribeToTopic(): void {
-    if (this.stompClient) {
-      console.log('Subscribing to topic...');
-      this.stompClient.subscribe('/topic/messages', (message) => {
-        console.log('Received: ' + message.body);
-        this.messageSubject.next(message.body);
-        console.log('Message emitted: ' + message.body);
-      }, (error: any) => {
-        console.error('Error in subscription: ', error);
-      });
-    }
+    this.ws.onclose = () => {
+      console.log('Disconnected');
+    };
   }
 
   sendMessage(message: string): void {
-    console.log('Sending message from service: ' + message);
-    if (this.stompClient) {
-      this.stompClient.send('/app/send', {}, message);
-      console.log('Message sent: ' + message);
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      console.log('Sending message: ' + message);
+      this.ws.send(message);
     }
   }
 
   disconnect(): void {
-    if (this.stompClient) {
-      this.stompClient.disconnect(() => {
-        console.log('Disconnected');
-      });
+    if (this.ws) {
+      this.ws.close();
     }
   }
 }
